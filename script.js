@@ -117,7 +117,7 @@ function setupMqttClient() {
         username: mqttUsername, 
         password: mqttPassword, 
         keepalive: 60,
-        protocol: 'ws',
+        protocol: 'wss',
         clean: true,
         connectTimeout: 30 * 1000
     };
