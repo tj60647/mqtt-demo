@@ -102,6 +102,33 @@ let message_current = "";
 */
 let mqttUsername = 'workshop-user';
 let mqttPassword = 'mqtt-fun-2026';
+let brokerPresetSelect;
+let selectedBrokerKey = 'workshop';
+let displayTimestampP;
+let messageFadeTimer;
+
+const brokerPresets = {
+    workshop: {
+        url: 'wss://mqtt.aroughidea.com:9001',
+        username: 'workshop-user',
+        password: 'mqtt-fun-2026'
+    },
+    workshop_ws: {
+        url: 'ws://mqtt.aroughidea.com:9001',
+        username: 'workshop-user',
+        password: 'mqtt-fun-2026'
+    },
+    mosquitto: {
+        url: 'wss://test.mosquitto.org:8081',
+        username: null,
+        password: null
+    },
+    local: {
+        url: 'ws://localhost:9001',
+        username: null,
+        password: null
+    }
+};
 
 // Sets up the user interface and MQTT client configurations
 function setup() {
@@ -111,16 +138,27 @@ function setup() {
 
 // Initializes and connects the MQTT client to the broker
 function setupMqttClient() {
+    const selectedPreset = brokerPresets[selectedBrokerKey] || brokerPresets.workshop;
+    mqttBrokerHost = selectedPreset.url;
+    mqttUsername = selectedPreset.username;
+    mqttPassword = selectedPreset.password;
+
+    const protocol = mqttBrokerHost.toLowerCase().startsWith('ws://') ? 'ws' : 'wss';
+
+    displayMessage('Connecting to broker...');
 
     // Define connection options
     const options = {
-        username: mqttUsername, 
-        password: mqttPassword, 
         keepalive: 60,
-        protocol: 'wss',
+        protocol,
         clean: true,
         connectTimeout: 30 * 1000
     };
+
+    if (mqttUsername && mqttPassword) {
+        options.username = mqttUsername;
+        options.password = mqttPassword;
+    }
 
     // Connect with options
     mqttClient = mqtt.connect(mqttBrokerHost, options);  // Connect WITH options
@@ -128,7 +166,7 @@ function setupMqttClient() {
     // Handles successful connection to the broker
     mqttClient.on('connect', function () {
         isMqttConnected = true;
-		displayMessage('Connected to the MQTT broker.');
+		displayMessage('Connected to broker.');
         connectionStatusP.html(`Connected: Yes`);
         displayMessage('Connected to MQTT broker, subscribing to: ' + topicName);
         mqttClient.subscribe(topicName, function (err) {
@@ -147,18 +185,53 @@ function setupMqttClient() {
 
     // Handles MQTT client errors
     mqttClient.on('error', function (error) {
+        isMqttConnected = false;
+        connectionStatusP.html(`Connected: No`);
         displayMessage('Connection Error:', error);
     });
 
     // Handles client going offline
     mqttClient.on('offline', function () {
+                isMqttConnected = false;
+                connectionStatusP.html(`Connected: No`);
 				displayMessage('MQTT Client is offline.');
     });
 
     // Handles client attempting to reconnect
     mqttClient.on('reconnect', function () {
-				displayMessage('Attempting to reconnect to the MQTT broker.');
+        isMqttConnected = false;
+        connectionStatusP.html(`Connected: No`);
+				displayMessage('Attempting to reconnect to broker...');
     });
+
+    mqttClient.on('close', function () {
+        isMqttConnected = false;
+        connectionStatusP.html(`Connected: No`);
+        displayMessage('MQTT connection closed.');
+    });
+}
+
+function reconnectToBroker() {
+    const selectedPreset = brokerPresets[selectedBrokerKey] || brokerPresets.workshop;
+    mqttBrokerHost = selectedPreset.url;
+    connectionStatusP.html('Connected: No');
+    isMqttConnected = false;
+
+    if (mqttClient) {
+        mqttClient.end(true);
+    }
+
+    displayMessage('Reconnecting to broker...');
+    setupMqttClient();
+}
+
+function onBrokerPresetChanged() {
+    const nextBrokerKey = brokerPresetSelect.value();
+    if (brokerPresets[nextBrokerKey]) {
+        selectedBrokerKey = nextBrokerKey;
+        displayMessage('Broker selected.');
+        reconnectToBroker();
+    }
 }
 
 // Validates the MQTT topic format
@@ -178,12 +251,16 @@ function updateTopicSubscription() {
 	if(!isValidTopic(newTopic))
 	{
 		displayMessage("Topic cannot contain '+', '#', or spaces.");
-		newTopic = newTopic.replace(" ","");
-		newTopic = newTopic.replace("+","");
-		newTopic = newTopic.replace("#","");
+		newTopic = newTopic.replace(/[ +#]/g, "");
 	}
 
     topicInput.value(newTopic);  // Set the trimmed value back to the input field (UI update)
+
+    // Stop early if still invalid after sanitization (e.g., empty)
+    if (!isValidTopic(newTopic)) {
+        displayMessage("Invalid MQTT topic. Subscription not updated.");
+        return;
+    }
 
     // Proceed only if the new topic is different from the current and is valid
     if (newTopic !== topicName && isValidTopic(newTopic)) {
@@ -211,10 +288,10 @@ function updateTopicSubscription() {
             topicName = newTopic;  // Store the new topic name to be used upon reconnection
         }
     } else if (newTopic === topicName) {
-			displayMessage("Invalid MQTT topic. Subscription not updated.");
+			displayMessage("New topic is the same as the current topic. No update needed.");
     } else {
         // If the topic is not valid, show an error message
-        displayMessage("New topic is the same as the current topic. No update needed.");
+        displayMessage("Invalid MQTT topic. Subscription not updated.");
     }
 }
 
@@ -259,6 +336,9 @@ function setupUserInterface() {
     uiPanel.style('padding', '15px');
     uiPanel.style('text-align', 'center');
     uiPanel.style('width', '300px');
+    uiPanel.style('height', '540px');
+    uiPanel.style('box-sizing', 'border-box');
+    uiPanel.style('overflow', 'hidden');
     uiPanel.style('border', '1px solid #ccc');
     uiPanel.style('border-radius', '15px');
     uiPanel.style('box-shadow', '0 2px 4px rgba(0,0,0,0.1)');
@@ -297,13 +377,17 @@ function setupUserInterface() {
     inputBox = createElement('textarea', '');
     inputBox.attribute('placeholder', 'Type your message here...');
     inputBox.style('margin', '10px 0');
-    inputBox.style('width', '280px');
-    inputBox.style('height', '30px');
+    inputBox.style('width', '100%');
+    inputBox.style('height', '48px');
     inputBox.style('background-color', '#fff'); // Sets the background color to white
     inputBox.style('border', '1px solid #ccc'); // Adds a border to the textarea
     inputBox.style('padding', '5px');
+    inputBox.style('box-sizing', 'border-box');
     inputBox.style('border-radius', '5px');
     inputBox.style('font-family', 'Arial, sans-serif');
+    inputBox.style('line-height', '16px');
+    inputBox.style('overflow-y', 'auto');
+    inputBox.style('overflow-x', 'hidden');
     inputBox.style('resize', 'none'); // Disables resizing of the textarea
     inputBox.parent(uiPanel);
 	
@@ -336,18 +420,15 @@ function setupUserInterface() {
     receivedMessageP.style('color', '#AAAAAA');
     receivedMessageP.style('font-size', '12px');
     receivedMessageP.style('font-family', 'Arial, sans-serif');
+    receivedMessageP.style('line-height', '16px');
     receivedMessageP.style('margin', '10px 0');
     receivedMessageP.style('border-radius', '5px');
     receivedMessageP.style('word-wrap', 'break-word');
     receivedMessageP.style('white-space', 'pre-wrap');
+    receivedMessageP.style('height', '48px');
+    receivedMessageP.style('overflow-y', 'auto');
+    receivedMessageP.style('overflow-x', 'hidden');
 
-    // Connection status display to inform the user of the MQTT client's status.
-    connectionStatusP = createP(`Connected: ${isMqttConnected ? 'Yes' : 'No'}`);
-    connectionStatusP.parent(uiPanel);
-    connectionStatusP.style('font-family', 'Arial, sans-serif');
-    connectionStatusP.style('font-size', '12px');
-    connectionStatusP.style('margin', '5px 0');
-	
     // Create and style the container for the editable topic information
     let topicContainer = createDiv('');
     topicContainer.parent(uiPanel);
@@ -370,40 +451,144 @@ function setupUserInterface() {
     topicInput.style('padding', '2px 3px');
     topicInput.style('font-size', '12px');
 	
-	    // Listen for changes in the topic input and update subscription
-    topicInput.input(updateTopicSubscription);
+	    // Listen for committed changes (blur/enter) to avoid rapid resubscribe while typing
+    topicInput.changed(updateTopicSubscription);
 
-		// Creates a label for host information.
-  	hostLabelP = createP('Host: '+ mqttBrokerHost);
-  	hostLabelP.parent(uiPanel);
-  	hostLabelP.style('font-family', 'Arial, sans-serif');
-  	hostLabelP.style('color', '#333');
-  	hostLabelP.style('font-size', '12px');
-  	hostLabelP.style('margin', '5px 0'); 
-    
-    // Error message display
+    // Broker configuration controls
+    let brokerContainer = createDiv('');
+    brokerContainer.parent(uiPanel);
+    brokerContainer.style('display', 'flex');
+    brokerContainer.style('justify-content', 'space-between');
+    brokerContainer.style('align-items', 'center');
+    brokerContainer.style('gap', '6px');
+    brokerContainer.style('margin-bottom', '10px');
+
+    let brokerLabel = createP('Host:');
+    brokerLabel.parent(brokerContainer);
+    brokerLabel.style('font-family', 'Arial, sans-serif');
+    brokerLabel.style('color', '#333');
+    brokerLabel.style('font-size', '12px');
+    brokerLabel.style('margin', '0 5px 0 0');
+
+    brokerPresetSelect = createSelect();
+    brokerPresetSelect.parent(brokerContainer);
+    brokerPresetSelect.option('wss://mqtt.aroughidea.com:9001', 'workshop');
+    brokerPresetSelect.option('ws://mqtt.aroughidea.com:9001', 'workshop_ws');
+    brokerPresetSelect.option('wss://test.mosquitto.org:8081', 'mosquitto');
+    brokerPresetSelect.option('ws://localhost:9001', 'local');
+    brokerPresetSelect.style('font-size', '12px');
+    brokerPresetSelect.style('flex', '1');
+        brokerPresetSelect.selected(selectedBrokerKey);
+    brokerPresetSelect.changed(onBrokerPresetChanged);
+
+    // Connection status display to inform the user of the MQTT client's status.
+    connectionStatusP = createP(`Connected: ${isMqttConnected ? 'Yes' : 'No'}`);
+    connectionStatusP.parent(uiPanel);
+    connectionStatusP.style('font-family', 'Arial, sans-serif');
+    connectionStatusP.style('font-size', '12px');
+    connectionStatusP.style('margin', '5px 0');
+
+    // Connection message display with timestamp on a separate line.
+    let statusContainer = createDiv('');
+    statusContainer.parent(uiPanel);
+    statusContainer.style('height', '80px');
+    statusContainer.style('max-height', '80px');
+    statusContainer.style('overflow', 'hidden');
+    statusContainer.style('text-align', 'center');
+
+    displayTimestampP = createP('');
+    displayTimestampP.parent(statusContainer);
+    displayTimestampP.style('color', '#D11A2A');
+    displayTimestampP.style('font-family', 'Arial, sans-serif');
+    displayTimestampP.style('font-size', '10px');
+    displayTimestampP.style('line-height', '16px');
+    displayTimestampP.style('height', '16px');
+    displayTimestampP.style('margin', '0 0 2px 0');
+    displayTimestampP.style('white-space', 'nowrap');
+    displayTimestampP.style('overflow', 'hidden');
+    displayTimestampP.style('text-overflow', 'ellipsis');
+    displayTimestampP.style('transition', 'color 4s ease');
+
     displayMessageP = createP('Ready'); // Placeholder text to reserve vertical space
-    displayMessageP.parent(uiPanel);
-    displayMessageP.style('color', 'red');
+    displayMessageP.parent(statusContainer);
+    displayMessageP.style('color', '#D11A2A');
     displayMessageP.style('font-family', 'Arial, sans-serif');
     displayMessageP.style('font-size', '10px');
-    displayMessageP.style('margin', '10px 0');
-    displayMessageP.style('visibility', 'hidden'); // Hide it but keep the space
+    displayMessageP.style('line-height', '16px');
+    displayMessageP.style('height', '64px');
+    displayMessageP.style('margin', '0');
+    displayMessageP.style('overflow', 'hidden');
+    displayMessageP.style('text-overflow', 'ellipsis');
+    displayMessageP.style('display', '-webkit-box');
+    displayMessageP.style('-webkit-line-clamp', '4');
+    displayMessageP.style('-webkit-box-orient', 'vertical');
+    displayMessageP.style('word-break', 'break-word');
+    displayMessageP.style('transition', 'color 4s ease');
 }
 
 // Function to display and manage error messages in the UI.
-function displayMessage(message) {
+function displayMessage(message, details) {
 	
 		// get the current time
     const timestamp = getTimestamp();
-	
-  	// Concatenate the timestamp with the original message
-    const messageWithTimestamp = `[${timestamp}] ${message}`;
-	
-    console.log("displayMessage: " + messageWithTimestamp);
-    displayMessageP.html(message); // Set the error message text.
-    displayMessageP.style('visibility', 'visible'); // Make the error message visible.
-    setTimeout(() => displayMessageP.style('visibility', 'hidden'), 4000); // Hide visibility (keep space)
+
+    const detailsText = formatDetailsText(details);
+	const baseText = `${message}`;
+	const messageText = detailsText ? `${baseText} ${detailsText}` : `${baseText}`;
+    const isErrorMessage = baseText.toLowerCase().includes('error');
+
+    console.log(`displayMessage: [${timestamp}] ${messageText}`);
+    displayTimestampP.html(`[${timestamp}]`);
+    if (detailsText && isErrorMessage) {
+        displayMessageP.html(`${escapeHtml(baseText)} <span style="color:#1E5AE8;">${escapeHtml(detailsText)}</span>`);
+    } else {
+        displayMessageP.html(escapeHtml(messageText));
+    }
+
+    if (messageFadeTimer) {
+        clearTimeout(messageFadeTimer);
+    }
+
+    displayTimestampP.style('transition', 'none');
+    displayTimestampP.style('color', '#D11A2A');
+    displayMessageP.style('transition', 'none');
+    displayMessageP.style('color', '#D11A2A');
+    void displayMessageP.elt.offsetWidth;
+    displayTimestampP.style('transition', 'color 4s ease');
+    displayMessageP.style('transition', 'color 4s ease');
+    messageFadeTimer = setTimeout(() => {
+        displayTimestampP.style('color', '#666666');
+        displayMessageP.style('color', '#4A4A4A');
+    }, 1000);
+}
+
+function formatDetailsText(details) {
+    if (details === undefined || details === null) {
+        return '';
+    }
+
+    if (typeof details === 'string') {
+        return details;
+    }
+
+    if (details instanceof Error) {
+        return details.message;
+    }
+
+    try {
+        return JSON.stringify(details);
+    } catch (_error) {
+        return String(details);
+    }
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function getTimestamp() {

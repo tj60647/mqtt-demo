@@ -1,0 +1,6 @@
+@echo off
+echo Starting MQTT Demo local server...
+echo Opening http://localhost:8000 in your default browser after server startup...
+start "" cmd /c "timeout /t 1 /nobreak >nul & start "" http://localhost:8000"
+python -m http.server 8000
+pause

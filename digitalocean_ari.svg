@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Background -->
+  <rect x="0" y="0" width="256" height="256" fill="#1e40af" />
+
+  <!-- Logo (shifted up) -->
+  <g transform="translate(0,-48)">
+    <path
+      d="M128 240v-32.4c34.3 0 61-34 47.9-69.9-4.8-13.4-15.6-24.1-29-29-35.9-13-69.9 13.4-69.9 47.9H44c0-54.4 52.6-96.8 109.6-79 24.9 7.8 44.8 27.7 52.6 52.6 17.8 57-24.6 109.8-79.2 109.8z"
+      fill="#ffffff"
+    />
+    <path
+      d="M128 207.6H96v-32h32zm-32 24.4H71.6v-24.4H96zm-24.4-24.4H50v-20.4h21.6z"
+      fill="#ffffff"
+    />
+  </g>
+
+  <!-- Label -->
+  <text
+    x="128"
+    y="232"
+    text-anchor="middle"
+    fill="#ffffff"
+    font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+    font-size="30"
+    font-weight="600"
+    letter-spacing="1.5"
+  >
+    A ROUGH IDEA
+  </text>
+</svg>
