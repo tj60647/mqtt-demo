@@ -192,6 +192,11 @@ const brokerPresets = {
         url: 'ws://localhost:9001',
         username: null,
         password: null
+    },
+    local_wss: {
+        url: 'wss://localhost:9001',
+        username: null,
+        password: null
     }
 };
 
@@ -618,6 +623,7 @@ function setupUserInterface() {
     brokerPresetSelect.option('ws://mqtt.aroughidea.com:9001', 'workshop_ws');
     brokerPresetSelect.option('wss://test.mosquitto.org:8081', 'mosquitto');
     brokerPresetSelect.option('ws://localhost:9001', 'local');
+    brokerPresetSelect.option('wss://localhost:9001', 'local_wss');
     brokerPresetSelect.style('font-size', '12px');
     brokerPresetSelect.style('flex', '1');
         brokerPresetSelect.selected(selectedBrokerKey);
