@@ -103,9 +103,71 @@ let message_current = "";
 let mqttUsername = 'workshop-user';
 let mqttPassword = 'mqtt-fun-2026';
 let brokerPresetSelect;
-let selectedBrokerKey = 'workshop';
+let selectedBrokerKey = 'mosquitto';
 let displayTimestampP;
 let messageFadeTimer;
+let tsModalOverlay;
+
+const tsClientCodeExample = `/**
+ * MQTT TypeScript Beginner Example
+ * --------------------------------
+ * 1) Connect to a broker over WebSocket
+ * 2) Subscribe to a topic
+ * 3) Print incoming messages
+ * 4) Publish a test message
+ *
+ * Install:
+ *   npm install mqtt
+ */
+
+import mqtt, { MqttClient } from 'mqtt';
+
+// Use one of your demo hosts from the UI
+const brokerUrl = 'wss://test.mosquitto.org:8081';
+
+// Pick any topic string that your app will use
+const topic = 'wildlytransparent/mqtt';
+
+// Create and connect the client
+const client: MqttClient = mqtt.connect(brokerUrl, {
+    connectTimeout: 30_000,
+    clean: true,
+
+    // For private brokers, replace placeholders with real values
+    // (Do not commit real credentials to source control)
+    username: '<USERNAME>',
+    password: '<PASSWORD>'
+});
+
+// Fires once connection is successful
+client.on('connect', () => {
+    console.log('Connected to broker');
+
+    // Subscribe so we can receive messages on this topic
+    client.subscribe(topic, (error) => {
+        if (error) {
+            console.error('Subscribe failed:', error.message);
+            return;
+        }
+
+        console.log('Subscribed to:', topic);
+
+        // Publish a starter message after subscribing
+        client.publish(topic, 'Hello from TypeScript!');
+    });
+});
+
+// Fires whenever a message arrives on subscribed topics
+client.on('message', (incomingTopic, payload) => {
+    console.log('Message received');
+    console.log('Topic:', incomingTopic);
+    console.log('Payload:', payload.toString());
+});
+
+// Fires on network/protocol/auth errors
+client.on('error', (error) => {
+    console.error('MQTT error:', error.message);
+});`;
 
 const brokerPresets = {
     workshop: {
@@ -339,6 +401,7 @@ function setupUserInterface() {
     uiPanel.style('height', '540px');
     uiPanel.style('box-sizing', 'border-box');
     uiPanel.style('overflow', 'hidden');
+    uiPanel.style('position', 'relative');
     uiPanel.style('border', '1px solid #ccc');
     uiPanel.style('border-radius', '15px');
     uiPanel.style('box-shadow', '0 2px 4px rgba(0,0,0,0.1)');
@@ -404,6 +467,23 @@ function setupUserInterface() {
     let publishButton = createButton('Publish MQTT Message');
     publishButton.mousePressed(publishButton_handler);
     publishButton.parent(uiPanel);
+
+    let tsCodeButton = createButton('i');
+    tsCodeButton.mousePressed(openTsCodeModal);
+    tsCodeButton.parent(uiPanel);
+    tsCodeButton.attribute('title', 'View TypeScript client example');
+    tsCodeButton.style('position', 'absolute');
+    tsCodeButton.style('left', '50%');
+    tsCodeButton.style('bottom', '10px');
+    tsCodeButton.style('transform', 'translateX(-50%)');
+    tsCodeButton.style('width', '16px');
+    tsCodeButton.style('height', '16px');
+    tsCodeButton.style('line-height', '14px');
+    tsCodeButton.style('padding', '0');
+    tsCodeButton.style('border-radius', '50%');
+    tsCodeButton.style('font-size', '10px');
+    tsCodeButton.style('font-weight', 'bold');
+    tsCodeButton.style('cursor', 'pointer');
     
     // Label and paragraph for displaying received messages.
     let receivedMessageLabel = createP('Last Received Message:');
@@ -524,6 +604,98 @@ function setupUserInterface() {
     displayMessageP.style('-webkit-box-orient', 'vertical');
     displayMessageP.style('word-break', 'break-word');
     displayMessageP.style('transition', 'color 4s ease');
+
+    createTsCodeModal();
+}
+
+function createTsCodeModal() {
+    if (tsModalOverlay) {
+        return;
+    }
+
+    tsModalOverlay = createDiv('');
+    tsModalOverlay.style('position', 'fixed');
+    tsModalOverlay.style('top', '0');
+    tsModalOverlay.style('left', '0');
+    tsModalOverlay.style('width', '100vw');
+    tsModalOverlay.style('height', '100vh');
+    tsModalOverlay.style('background-color', 'rgba(0,0,0,0.45)');
+    tsModalOverlay.style('display', 'none');
+    tsModalOverlay.style('align-items', 'center');
+    tsModalOverlay.style('justify-content', 'center');
+    tsModalOverlay.style('z-index', '9999');
+
+    const modalCard = createDiv('');
+    modalCard.parent(tsModalOverlay);
+    modalCard.style('width', 'min(760px, 92vw)');
+    modalCard.style('max-height', '80vh');
+    modalCard.style('background-color', '#ffffff');
+    modalCard.style('border-radius', '10px');
+    modalCard.style('padding', '12px');
+    modalCard.style('box-sizing', 'border-box');
+    modalCard.style('display', 'flex');
+    modalCard.style('flex-direction', 'column');
+    modalCard.style('gap', '8px');
+
+    const modalHeader = createDiv('');
+    modalHeader.parent(modalCard);
+    modalHeader.style('display', 'flex');
+    modalHeader.style('justify-content', 'space-between');
+    modalHeader.style('align-items', 'center');
+
+    const modalTitle = createElement('h4', 'TypeScript MQTT Client Example');
+    modalTitle.parent(modalHeader);
+    modalTitle.style('margin', '0');
+
+    const closeButton = createButton('Close');
+    closeButton.parent(modalHeader);
+    closeButton.mousePressed(closeTsCodeModal);
+
+    const modalNote = createP('Uses placeholder credentials only. Replace <USERNAME>/<PASSWORD> for private brokers.');
+    modalNote.parent(modalCard);
+    modalNote.style('margin', '0');
+    modalNote.style('font-size', '12px');
+
+    const codePre = createElement('pre', '');
+    codePre.parent(modalCard);
+    codePre.style('margin', '0');
+    codePre.style('padding', '10px');
+    codePre.style('background-color', '#f5f5f5');
+    codePre.style('border', '1px solid #ddd');
+    codePre.style('border-radius', '8px');
+    codePre.style('overflow', 'auto');
+    codePre.style('font-size', '12px');
+    codePre.style('line-height', '1.4');
+    codePre.style('max-height', '60vh');
+    codePre.html(escapeHtml(tsClientCodeExample));
+
+    tsModalOverlay.mousePressed(function() {
+        closeTsCodeModal();
+    });
+
+    modalCard.mousePressed(function(event) {
+        event.stopPropagation();
+    });
+
+    window.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeTsCodeModal();
+        }
+    });
+}
+
+function openTsCodeModal() {
+    if (!tsModalOverlay) {
+        return;
+    }
+    tsModalOverlay.style('display', 'flex');
+}
+
+function closeTsCodeModal() {
+    if (!tsModalOverlay) {
+        return;
+    }
+    tsModalOverlay.style('display', 'none');
 }
 
 // Function to display and manage error messages in the UI.
