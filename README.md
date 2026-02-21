@@ -5,6 +5,7 @@ This project is a simple MQTT client demonstration using **p5.js** and **mqtt.js
 ## Files
 - `index.html`: The main web page. It loads the required libraries.
 - `script.js`: The application logic (p5.js sketch).
+- `ROADMAP.md`: Planned next steps for TLS, security, and reliability.
 
 ## How to Run
 
