@@ -104,6 +104,9 @@ let mqttUsername = 'workshop-user';
 let mqttPassword = 'mqtt-fun-2026';
 let brokerPresetSelect;
 let selectedBrokerKey = 'mosquitto';
+const mqttKeepaliveSeconds = 60;
+let lastMqttActivityMs = null;
+let connectionStatusTimerId = null;
 let displayTimestampP;
 let messageFadeTimer;
 let tsModalOverlay;
@@ -211,7 +214,7 @@ function setupMqttClient() {
 
     // Define connection options
     const options = {
-        keepalive: 60,
+        keepalive: mqttKeepaliveSeconds,
         protocol,
         clean: true,
         connectTimeout: 30 * 1000
@@ -225,11 +228,21 @@ function setupMqttClient() {
     // Connect with options
     mqttClient = mqtt.connect(mqttBrokerHost, options);  // Connect WITH options
 
+    // Track MQTT traffic so the keepalive timer reflects real activity.
+    mqttClient.on('packetsend', function () {
+        noteMqttActivity();
+    });
+
+    mqttClient.on('packetreceive', function () {
+        noteMqttActivity();
+    });
+
     // Handles successful connection to the broker
     mqttClient.on('connect', function () {
         isMqttConnected = true;
 		displayMessage('Connected to broker.');
-        connectionStatusP.html(`Connected: Yes`);
+        startConnectionStatusTimer();
+        noteMqttActivity();
         displayMessage('Connected to MQTT broker, subscribing to: ' + topicName);
         mqttClient.subscribe(topicName, function (err) {
             if (err) displayMessage('Initial subscription error:', err);
@@ -248,36 +261,85 @@ function setupMqttClient() {
     // Handles MQTT client errors
     mqttClient.on('error', function (error) {
         isMqttConnected = false;
-        connectionStatusP.html(`Connected: No`);
+        stopConnectionStatusTimer();
         displayMessage('Connection Error:', error);
     });
 
     // Handles client going offline
     mqttClient.on('offline', function () {
                 isMqttConnected = false;
-                connectionStatusP.html(`Connected: No`);
+				stopConnectionStatusTimer();
 				displayMessage('MQTT Client is offline.');
     });
 
     // Handles client attempting to reconnect
     mqttClient.on('reconnect', function () {
         isMqttConnected = false;
-        connectionStatusP.html(`Connected: No`);
+				stopConnectionStatusTimer();
 				displayMessage('Attempting to reconnect to broker...');
     });
 
     mqttClient.on('close', function () {
         isMqttConnected = false;
-        connectionStatusP.html(`Connected: No`);
+        stopConnectionStatusTimer();
         displayMessage('MQTT connection closed.');
     });
+}
+
+function formatCountdown(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function noteMqttActivity() {
+    if (!isMqttConnected) {
+        return;
+    }
+
+    lastMqttActivityMs = Date.now();
+    updateConnectionStatusDisplay();
+}
+
+function updateConnectionStatusDisplay() {
+    if (!connectionStatusP) {
+        return;
+    }
+
+    if (!isMqttConnected || lastMqttActivityMs === null) {
+        connectionStatusP.html('Connected: No');
+        return;
+    }
+
+    const elapsedSinceActivity = Math.floor((Date.now() - lastMqttActivityMs) / 1000);
+    const keepaliveRemaining = Math.max(0, mqttKeepaliveSeconds - elapsedSinceActivity);
+    const countdownLabel = formatCountdown(keepaliveRemaining);
+    connectionStatusP.html(`Connected: Yes (KA ${countdownLabel}/${mqttKeepaliveSeconds}s)`);
+}
+
+function startConnectionStatusTimer() {
+    lastMqttActivityMs = Date.now();
+    if (connectionStatusTimerId) {
+        clearInterval(connectionStatusTimerId);
+    }
+    updateConnectionStatusDisplay();
+    connectionStatusTimerId = setInterval(updateConnectionStatusDisplay, 1000);
+}
+
+function stopConnectionStatusTimer() {
+    lastMqttActivityMs = null;
+    if (connectionStatusTimerId) {
+        clearInterval(connectionStatusTimerId);
+        connectionStatusTimerId = null;
+    }
+    updateConnectionStatusDisplay();
 }
 
 function reconnectToBroker() {
     const selectedPreset = brokerPresets[selectedBrokerKey] || brokerPresets.workshop;
     mqttBrokerHost = selectedPreset.url;
-    connectionStatusP.html('Connected: No');
     isMqttConnected = false;
+    stopConnectionStatusTimer();
 
     if (mqttClient) {
         mqttClient.end(true);
@@ -562,11 +624,12 @@ function setupUserInterface() {
     brokerPresetSelect.changed(onBrokerPresetChanged);
 
     // Connection status display to inform the user of the MQTT client's status.
-    connectionStatusP = createP(`Connected: ${isMqttConnected ? 'Yes' : 'No'}`);
+    connectionStatusP = createP('Connected: No');
     connectionStatusP.parent(uiPanel);
     connectionStatusP.style('font-family', 'Arial, sans-serif');
     connectionStatusP.style('font-size', '12px');
     connectionStatusP.style('margin', '5px 0');
+    updateConnectionStatusDisplay();
 
     // Connection message display with timestamp on a separate line.
     let statusContainer = createDiv('');
