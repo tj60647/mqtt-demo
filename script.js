@@ -496,12 +496,27 @@ function setupUserInterface() {
     titleHeader.style('color', '#333');
 
     // Intro paragraph explaining what this demo is and who it is for.
-    let instructionsParagraph = createP('This is an MQTT publish/subscribe demo for browser-based learning and testing. Use it to quickly publish messages, subscribe to topics, and observe real-time messaging behavior before integrating MQTT into apps or device workflows.');
+    let instructionsParagraph = createP('This is an MQTT publish/subscribe demo for browser-based learning and testing.');
     instructionsParagraph.parent(uiPanel);
     instructionsParagraph.style('color', '#333');
     instructionsParagraph.style('font-size', '14px');
     instructionsParagraph.style('font-family', 'Arial, sans-serif');
     instructionsParagraph.style('margin', '10px 0');
+
+    let tsCodeButton = createButton('i');
+    tsCodeButton.mousePressed(openTsCodeModal);
+    tsCodeButton.parent(uiPanel);
+    tsCodeButton.attribute('title', 'View TypeScript client example');
+    tsCodeButton.style('display', 'block');
+    tsCodeButton.style('margin', '0 auto 0px auto');
+    tsCodeButton.style('width', '16px');
+    tsCodeButton.style('height', '16px');
+    tsCodeButton.style('line-height', '14px');
+    tsCodeButton.style('padding', '0');
+    tsCodeButton.style('border-radius', '50%');
+    tsCodeButton.style('font-size', '10px');
+    tsCodeButton.style('font-weight', 'bold');
+    tsCodeButton.style('cursor', 'pointer');
     
     // Input box for message entry, designed to be intuitive and user-friendly.
     inputBox = createElement('textarea', '');
@@ -535,23 +550,6 @@ function setupUserInterface() {
     publishButton.mousePressed(publishButton_handler);
     publishButton.parent(uiPanel);
 
-    let tsCodeButton = createButton('i');
-    tsCodeButton.mousePressed(openTsCodeModal);
-    tsCodeButton.parent(uiPanel);
-    tsCodeButton.attribute('title', 'View TypeScript client example');
-    tsCodeButton.style('position', 'absolute');
-    tsCodeButton.style('left', '50%');
-    tsCodeButton.style('bottom', '10px');
-    tsCodeButton.style('transform', 'translateX(-50%)');
-    tsCodeButton.style('width', '16px');
-    tsCodeButton.style('height', '16px');
-    tsCodeButton.style('line-height', '14px');
-    tsCodeButton.style('padding', '0');
-    tsCodeButton.style('border-radius', '50%');
-    tsCodeButton.style('font-size', '10px');
-    tsCodeButton.style('font-weight', 'bold');
-    tsCodeButton.style('cursor', 'pointer');
-    
     // Label and paragraph for displaying received messages.
     let receivedMessageLabel = createP('Last Received Message:');
     receivedMessageLabel.parent(uiPanel);
