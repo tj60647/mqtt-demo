@@ -495,8 +495,8 @@ function setupUserInterface() {
     titleHeader.style('margin', '0');
     titleHeader.style('color', '#333');
 
-    // Instructions paragraph explaining how to use the interface.
-    let instructionsParagraph = createP('Please type a message in the input box and click "Publish MQTT Message" or hit enter to send your message via MQTT.');
+    // Intro paragraph explaining what this demo is and who it is for.
+    let instructionsParagraph = createP('This is an MQTT publish/subscribe demo for browser-based learning and testing. Use it to quickly publish messages, subscribe to topics, and observe real-time messaging behavior before integrating MQTT into apps or device workflows.');
     instructionsParagraph.parent(uiPanel);
     instructionsParagraph.style('color', '#333');
     instructionsParagraph.style('font-size', '14px');
@@ -712,7 +712,7 @@ function createTsCodeModal() {
     modalHeader.style('justify-content', 'space-between');
     modalHeader.style('align-items', 'center');
 
-    const modalTitle = createElement('h4', 'TypeScript MQTT Client Example');
+    const modalTitle = createElement('h4', 'About This MQTT Demo + TypeScript Starter');
     modalTitle.parent(modalHeader);
     modalTitle.style('margin', '0');
 
@@ -720,10 +720,34 @@ function createTsCodeModal() {
     closeButton.parent(modalHeader);
     closeButton.mousePressed(closeTsCodeModal);
 
-    const modalNote = createP('Uses placeholder credentials only. Replace <USERNAME>/<PASSWORD> for private brokers.');
-    modalNote.parent(modalCard);
-    modalNote.style('margin', '0');
-    modalNote.style('font-size', '12px');
+    const modalIntro = createP('What is this? A lightweight MQTT demo client running in your browser over WebSockets. It lets you connect, subscribe, and publish without installing a full desktop MQTT tool.');
+    modalIntro.parent(modalCard);
+    modalIntro.style('margin', '0');
+    modalIntro.style('font-size', '12px');
+    modalIntro.style('line-height', '1.45');
+
+    const modalUseCases = createElement('ul', '');
+    modalUseCases.parent(modalCard);
+    modalUseCases.style('margin', '0 0 0 18px');
+    modalUseCases.style('padding', '0');
+    modalUseCases.style('font-size', '12px');
+    modalUseCases.style('line-height', '1.45');
+
+    createElement('li', 'Why use it: validate topic structure and payload flow quickly, with immediate feedback.').parent(modalUseCases);
+    createElement('li', 'Where used: IoT prototypes, workshop labs, telemetry demos, browser dashboards, and QA smoke tests.').parent(modalUseCases);
+    createElement('li', 'Who uses it: developers, integrators, students, trainers, and support/operations engineers.').parent(modalUseCases);
+
+    const modalSecurity = createP('Security note: any username/password placed in browser JavaScript is visible to end users and is not a secret. Use this only for demos/public test access. For production, keep credentials server-side and issue short-lived tokens to clients.');
+    modalSecurity.parent(modalCard);
+    modalSecurity.style('margin', '0');
+    modalSecurity.style('font-size', '12px');
+    modalSecurity.style('line-height', '1.45');
+    modalSecurity.style('color', '#A6131F');
+
+    const modalCodeLabel = createP('TypeScript starter example (includes placeholder auth fields for private brokers):');
+    modalCodeLabel.parent(modalCard);
+    modalCodeLabel.style('margin', '0');
+    modalCodeLabel.style('font-size', '12px');
 
     const codePre = createElement('pre', '');
     codePre.parent(modalCard);
