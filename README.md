@@ -89,7 +89,7 @@ The broker dropdown lets you switch between message servers.
 
 If you want to run the app on your own computer instead of using GitHub Pages, you have a few options:
 
-- **Windows shortcut**: Double-click `run_demo.bat`. It starts a local server and opens your browser automatically.
+- **Windows shortcut**: Double-click `run_demo.bat`. It starts a local HTTP server and opens your browser automatically.
 - **VS Code**: Install the "Live Server" extension, right-click `index.html`, and choose **Open with Live Server**.
 - **Direct open**: Double-click `index.html` to open it in your browser (most features will still work).
 
