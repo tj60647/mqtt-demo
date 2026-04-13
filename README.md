@@ -1,10 +1,11 @@
 # MQTT Demo
 
-This project is a simple MQTT client demonstration using **p5.js** and **mqtt.js**.
+This project is a simple MQTT client demonstration using **mqtt.js** and vanilla DOM APIs.
 
 ## Files
 - `index.html`: The main web page. It loads the required libraries.
-- `script.js`: The application logic (p5.js sketch).
+- `script.js`: The application logic (vanilla DOM UI + MQTT client).
+- `style.css`: Page layout styles.
 - `ROADMAP.md`: Planned next steps for TLS, security, and reliability.
 
 ## How to Run

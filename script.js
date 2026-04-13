@@ -5,12 +5,12 @@
   Overview:
   This code demonstrates a simple MQTT client implementation for educational purposes, showcasing how to
   establish a connection to an MQTT broker, subscribe to topics, publish messages, and display the status
-  and messages in a user-friendly interface. The script utilizes p5.js for creating a minimalistic user
-  interface consisting of an input field, a publish button, and paragraphs to display the connection status
+  and messages in a user-friendly interface. The script uses vanilla DOM APIs to build the interface,
+  consisting of an input field, a publish button, and paragraphs to display the connection status
   and received messages.
 
   Key Features:
-  - Connects to an MQTT broker using the MQTT.js library (see SKETCH>LIBRARIES>mqtt.min.js), allowing for real-time message exchange.
+  - Connects to an MQTT broker using the MQTT.js library, allowing for real-time message exchange.
 	- This example uses the MQTT broker at wss://test.mosquitto.org:8081, more information about this publicly available broker can be found here: https://test.mosquitto.org/
   - Subscribes to a predefined topic to listen for incoming messages.
   - Publishes messages to the MQTT broker on a specific topic, which can be entered through an input box.
@@ -70,21 +70,26 @@
 */
 
 // Initial variable declarations for the MQTT setup and UI management
-let mqttClient;  // Instance for MQTT client operations
-let receivedMessageText = "Waiting for MQTT messages...";  // Default text displayed in UI before any messages are received
+let mqttClient;           // Instance for MQTT client operations
+let receivedMessageText = "Waiting for MQTT messages...";  // Default text before any messages are received
 let isMqttConnected = false;  // Tracks the connection status of the MQTT client
 
 const defaultTopicName = 'wildlytransparent/mqtt';  // Default MQTT topic for initial subscription
 let topicName = defaultTopicName;  // Variable to store the current topic name
-let topicInput;  // HTML input element for changing the MQTT topic
 
 //let mqttBrokerHost = 'wss://test.mosquitto.org:8081';  // MQTT broker URL and port
 let mqttBrokerHost = 'wss://mqtt.aroughidea.com:9001';
 //let mqttBrokerHost = 'ws://64.23.251.180.nip.io:9001';
 
+// UI element references (populated by setupUserInterface)
+let inputBox;
+let receivedMessageP;
+let connectionStatusP;
+let displayMessageP;
+let topicInput;
+
 // Variables to compare the current and last messages sent
 let message_last = "";
-let message_current = "";
 
 /* 
   SECURITY WARNING:
@@ -200,11 +205,11 @@ const brokerPresets = {
     }
 };
 
-// Sets up the user interface and MQTT client configurations
-function setup() {
-    setupUserInterface();  // Initialize the user interface elements
-    setupMqttClient();  // Configure and connect the MQTT client
-}
+// Entry point — initializes the UI and connects to the MQTT broker once the DOM is ready
+document.addEventListener('DOMContentLoaded', function () {
+    setupUserInterface();
+    setupMqttClient();
+});
 
 // Initializes and connects the MQTT client to the broker
 function setupMqttClient() {
@@ -259,8 +264,8 @@ function setupMqttClient() {
     mqttClient.on('message', function (topic, message) {
         receivedMessageText = message.toString();
         displayMessage(`Received message on topic '${topic}': ${receivedMessageText}`);
-        receivedMessageP.style('color', receivedMessageText === message_last ? '#F32C54' : '#0412E3');
-        receivedMessageP.html(receivedMessageText);
+        receivedMessageP.style.color = receivedMessageText === message_last ? '#F32C54' : '#0412E3';
+        receivedMessageP.textContent = receivedMessageText;
     });
 
     // Handles MQTT client errors
@@ -312,14 +317,14 @@ function updateConnectionStatusDisplay() {
     }
 
     if (!isMqttConnected || lastMqttActivityMs === null) {
-        connectionStatusP.html('Connected: No');
+        connectionStatusP.textContent = 'Connected: No';
         return;
     }
 
     const elapsedSinceActivity = Math.floor((Date.now() - lastMqttActivityMs) / 1000);
     const keepaliveRemaining = Math.max(0, mqttKeepaliveSeconds - elapsedSinceActivity);
     const countdownLabel = formatCountdown(keepaliveRemaining);
-    connectionStatusP.html(`Connected: Yes (KA ${countdownLabel}/${mqttKeepaliveSeconds}s)`);
+    connectionStatusP.textContent = `Connected: Yes (KA ${countdownLabel}/${mqttKeepaliveSeconds}s)`;
 }
 
 function startConnectionStatusTimer() {
@@ -355,7 +360,7 @@ function reconnectToBroker() {
 }
 
 function onBrokerPresetChanged() {
-    const nextBrokerKey = brokerPresetSelect.value();
+    const nextBrokerKey = brokerPresetSelect.value;
     if (brokerPresets[nextBrokerKey]) {
         selectedBrokerKey = nextBrokerKey;
         displayMessage('Broker selected.');
@@ -374,16 +379,15 @@ function isValidTopic(topic) {
 
 // Updates the MQTT subscription if the topic changes
 function updateTopicSubscription() {
-    let newTopic = topicInput.value();
-	
-	// if the topic name is invalid display naming rules and eliminate the error causing characters
-	if(!isValidTopic(newTopic))
-	{
-		displayMessage("Topic cannot contain '+', '#', or spaces.");
-		newTopic = newTopic.replace(/[ +#]/g, "");
-	}
+    let newTopic = topicInput.value;
 
-    topicInput.value(newTopic);  // Set the trimmed value back to the input field (UI update)
+    // if the topic name is invalid, display naming rules and eliminate the error-causing characters
+    if (!isValidTopic(newTopic)) {
+        displayMessage("Topic cannot contain '+', '#', or spaces.");
+        newTopic = newTopic.replace(/[ +#]/g, "");
+    }
+
+    topicInput.value = newTopic;  // Set the sanitized value back to the input field (UI update)
 
     // Stop early if still invalid after sanitization (e.g., empty)
     if (!isValidTopic(newTopic)) {
@@ -391,8 +395,8 @@ function updateTopicSubscription() {
         return;
     }
 
-    // Proceed only if the new topic is different from the current and is valid
-    if (newTopic !== topicName && isValidTopic(newTopic)) {
+    // Proceed only if the new topic is different from the current
+    if (newTopic !== topicName) {
         if (mqttClient.connected) {
             // If client is connected, first unsubscribe from the current topic
             mqttClient.unsubscribe(topicName, function(err) {
@@ -412,15 +416,12 @@ function updateTopicSubscription() {
                 }
             });
         } else {
-            // If not connected, log this state and still update the topicName for future reconnection
-			displayMessage("Client not connected. Cannot update subscription until reconnected.");
-            topicName = newTopic;  // Store the new topic name to be used upon reconnection
+            // If not connected, store the new topic name for use upon reconnection
+            displayMessage("Client not connected. Cannot update subscription until reconnected.");
+            topicName = newTopic;
         }
-    } else if (newTopic === topicName) {
-			displayMessage("New topic is the same as the current topic. No update needed.");
     } else {
-        // If the topic is not valid, show an error message
-        displayMessage("Invalid MQTT topic. Subscription not updated.");
+        displayMessage("New topic is the same as the current topic. No update needed.");
     }
 }
 
@@ -448,229 +449,283 @@ function publishMessage(topic, message) {
 
 // Handles publish button click event
 function publishButton_handler() {
-    const messageContent = inputBox.value();
-    const currentTopic = topicInput.value();
+    const messageContent = inputBox.value;
+    const currentTopic = topicInput.value;
     publishMessage(currentTopic, messageContent);
-    inputBox.value('');  // Clear the input box after publishing
+    inputBox.value = '';  // Clear the input box after publishing
 }
 
 //********************************
 // Code to build the UI
 //********************************
 function setupUserInterface() {
-    noCanvas(); // Disables the p5.js canvas since we are focusing on HTML elements for the UI.
-    
-    // Main panel for UI elements, styled for a clean and approachable appearance.
-    let uiPanel = createDiv('');
-    uiPanel.style('padding', '15px');
-    uiPanel.style('text-align', 'center');
-    uiPanel.style('width', '300px');
-    uiPanel.style('height', '540px');
-    uiPanel.style('box-sizing', 'border-box');
-    uiPanel.style('overflow', 'hidden');
-    uiPanel.style('position', 'relative');
-    uiPanel.style('border', '1px solid #ccc');
-    uiPanel.style('border-radius', '15px');
-    uiPanel.style('box-shadow', '0 2px 4px rgba(0,0,0,0.1)');
-    uiPanel.style('background-color', '#f5f5f5');
-    // uiPanel.position(windowWidth / 2 - 150, windowHeight / 2 - 100); // Center the panel.
+    // Main panel
+    const uiPanel = document.createElement('div');
+    Object.assign(uiPanel.style, {
+        padding: '15px',
+        textAlign: 'center',
+        width: '300px',
+        height: '540px',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        position: 'relative',
+        border: '1px solid #ccc',
+        borderRadius: '15px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        backgroundColor: '#f5f5f5'
+    });
+    document.body.appendChild(uiPanel);
 
-    // Header with Icon and Title
-    let headerDiv = createDiv('');
-    headerDiv.parent(uiPanel);
-    headerDiv.style('display', 'flex');
-    headerDiv.style('flex-direction', 'column');
-    headerDiv.style('align-items', 'center');
-    headerDiv.style('justify-content', 'center');
-    headerDiv.style('margin-bottom', '15px');
+    // Header with icon and title
+    const headerDiv = document.createElement('div');
+    Object.assign(headerDiv.style, {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: '15px'
+    });
+    uiPanel.appendChild(headerDiv);
 
-    let iconImg = createImg('mqtt-icon.svg', 'MQTT Icon');
-    iconImg.parent(headerDiv);
-    iconImg.style('width', '64px');
-    iconImg.style('height', '64px');
-    iconImg.style('margin-bottom', '10px');
+    const iconImg = document.createElement('img');
+    iconImg.src = 'mqtt-icon.svg';
+    iconImg.alt = 'MQTT Icon';
+    Object.assign(iconImg.style, {
+        width: '64px',
+        height: '64px',
+        marginBottom: '10px'
+    });
+    headerDiv.appendChild(iconImg);
 
-    let titleHeader = createElement('h3', 'MQTT Demo');
-    titleHeader.parent(headerDiv);
-    titleHeader.style('margin', '0');
-    titleHeader.style('color', '#333');
+    const titleHeader = document.createElement('h3');
+    titleHeader.textContent = 'MQTT Demo';
+    Object.assign(titleHeader.style, {
+        margin: '0',
+        color: '#333'
+    });
+    headerDiv.appendChild(titleHeader);
 
-    // Intro paragraph explaining what this demo is and who it is for.
-    let instructionsParagraph = createP('This is an MQTT publish/subscribe demo for browser-based learning and testing.');
-    instructionsParagraph.parent(uiPanel);
-    instructionsParagraph.style('color', '#333');
-    instructionsParagraph.style('font-size', '14px');
-    instructionsParagraph.style('font-family', 'Arial, sans-serif');
-    instructionsParagraph.style('margin', '10px 0');
+    // Intro paragraph
+    const instructionsParagraph = document.createElement('p');
+    instructionsParagraph.textContent = 'This is an MQTT publish/subscribe demo for browser-based learning and testing.';
+    Object.assign(instructionsParagraph.style, {
+        color: '#333',
+        fontSize: '14px',
+        fontFamily: 'Arial, sans-serif',
+        margin: '10px 0'
+    });
+    uiPanel.appendChild(instructionsParagraph);
 
-    let tsCodeButton = createButton('i');
-    tsCodeButton.mousePressed(openTsCodeModal);
-    tsCodeButton.parent(uiPanel);
-    tsCodeButton.attribute('title', 'View TypeScript client example');
-    tsCodeButton.style('display', 'block');
-    tsCodeButton.style('margin', '0 auto 0px auto');
-    tsCodeButton.style('width', '16px');
-    tsCodeButton.style('height', '16px');
-    tsCodeButton.style('line-height', '14px');
-    tsCodeButton.style('padding', '0');
-    tsCodeButton.style('border-radius', '50%');
-    tsCodeButton.style('font-size', '10px');
-    tsCodeButton.style('font-weight', 'bold');
-    tsCodeButton.style('cursor', 'pointer');
-    
-    // Input box for message entry, designed to be intuitive and user-friendly.
-    inputBox = createElement('textarea', '');
-    inputBox.attribute('placeholder', 'Type your message here...');
-    inputBox.style('margin', '10px 0');
-    inputBox.style('width', '100%');
-    inputBox.style('height', '48px');
-    inputBox.style('background-color', '#fff'); // Sets the background color to white
-    inputBox.style('border', '1px solid #ccc'); // Adds a border to the textarea
-    inputBox.style('padding', '5px');
-    inputBox.style('box-sizing', 'border-box');
-    inputBox.style('border-radius', '5px');
-    inputBox.style('font-family', 'Arial, sans-serif');
-    inputBox.style('line-height', '16px');
-    inputBox.style('overflow-y', 'auto');
-    inputBox.style('overflow-x', 'hidden');
-    inputBox.style('resize', 'none'); // Disables resizing of the textarea
-    inputBox.parent(uiPanel);
-	
-		// Event listener for capturing Enter key press in the textarea
-		inputBox.elt.addEventListener('keydown', function(event) {
-    	// Check if the Enter key is pressed
-    	if (event.key === "Enter" && !event.shiftKey) {  // The shiftKey check allows multi-line input if Shift+Enter is pressed
-        event.preventDefault();  // Prevent the default action to stop from inserting a new line
-        publishButton_handler();  // Call the function that handles publishing
-    	}
-		});
+    // Info button
+    const tsCodeButton = document.createElement('button');
+    tsCodeButton.textContent = 'i';
+    tsCodeButton.setAttribute('title', 'View TypeScript client example');
+    tsCodeButton.addEventListener('click', openTsCodeModal);
+    Object.assign(tsCodeButton.style, {
+        display: 'block',
+        margin: '0 auto 0px auto',
+        width: '16px',
+        height: '16px',
+        lineHeight: '14px',
+        padding: '0',
+        borderRadius: '50%',
+        fontSize: '10px',
+        fontWeight: 'bold',
+        cursor: 'pointer'
+    });
+    uiPanel.appendChild(tsCodeButton);
 
-    // Publish button to send messages.
-    let publishButton = createButton('Publish MQTT Message');
-    publishButton.mousePressed(publishButton_handler);
-    publishButton.parent(uiPanel);
+    // Message textarea
+    inputBox = document.createElement('textarea');
+    inputBox.setAttribute('placeholder', 'Type your message here...');
+    Object.assign(inputBox.style, {
+        margin: '10px 0',
+        width: '100%',
+        height: '48px',
+        backgroundColor: '#fff',
+        border: '1px solid #ccc',
+        padding: '5px',
+        boxSizing: 'border-box',
+        borderRadius: '5px',
+        fontFamily: 'Arial, sans-serif',
+        lineHeight: '16px',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        resize: 'none'
+    });
+    // Enter key submits; Shift+Enter allows a newline
+    inputBox.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            publishButton_handler();
+        }
+    });
+    uiPanel.appendChild(inputBox);
 
-    // Label and paragraph for displaying received messages.
-    let receivedMessageLabel = createP('Last Received Message:');
-    receivedMessageLabel.parent(uiPanel);
-    receivedMessageLabel.style('font-family', 'Arial, sans-serif');
-    receivedMessageLabel.style('font-size', '12px');
-    receivedMessageLabel.style('margin', '10px 0');
-    receivedMessageLabel.style('color', '#333');
-    
-    // Display for received messages, initially set to show a waiting message.
-    receivedMessageP = createP(receivedMessageText);
-    receivedMessageP.parent(uiPanel);
-    receivedMessageP.style('background-color', '#fff');
-    receivedMessageP.style('color', '#AAAAAA');
-    receivedMessageP.style('font-size', '12px');
-    receivedMessageP.style('font-family', 'Arial, sans-serif');
-    receivedMessageP.style('line-height', '16px');
-    receivedMessageP.style('margin', '10px 0');
-    receivedMessageP.style('border-radius', '5px');
-    receivedMessageP.style('word-wrap', 'break-word');
-    receivedMessageP.style('white-space', 'pre-wrap');
-    receivedMessageP.style('height', '48px');
-    receivedMessageP.style('overflow-y', 'auto');
-    receivedMessageP.style('overflow-x', 'hidden');
+    // Publish button
+    const publishButton = document.createElement('button');
+    publishButton.textContent = 'Publish MQTT Message';
+    publishButton.addEventListener('click', publishButton_handler);
+    uiPanel.appendChild(publishButton);
 
-    // Create and style the container for the editable topic information
-    let topicContainer = createDiv('');
-    topicContainer.parent(uiPanel);
-    topicContainer.style('display', 'flex');
-    topicContainer.style('justify-content', 'space-between');
-    topicContainer.style('align-items', 'center');
-    topicContainer.style('margin-bottom', '10px');
+    // Received message label
+    const receivedMessageLabel = document.createElement('p');
+    receivedMessageLabel.textContent = 'Last Received Message:';
+    Object.assign(receivedMessageLabel.style, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '12px',
+        margin: '10px 0',
+        color: '#333'
+    });
+    uiPanel.appendChild(receivedMessageLabel);
 
-    // Add label and input for the MQTT topic within the container
-    let topicLabel = createP('Topic:');
-    topicLabel.parent(topicContainer);
-    topicLabel.style('font-family', 'Arial, sans-serif');
-    topicLabel.style('color', '#333');
-    topicLabel.style('font-size', '12px');
-    topicLabel.style('margin', '0 5px 0 0'); // Right margin for spacing
+    // Received message display
+    receivedMessageP = document.createElement('p');
+    receivedMessageP.textContent = receivedMessageText;
+    Object.assign(receivedMessageP.style, {
+        backgroundColor: '#fff',
+        color: '#AAAAAA',
+        fontSize: '12px',
+        fontFamily: 'Arial, sans-serif',
+        lineHeight: '16px',
+        margin: '10px 0',
+        borderRadius: '5px',
+        wordWrap: 'break-word',
+        whiteSpace: 'pre-wrap',
+        height: '48px',
+        overflowY: 'auto',
+        overflowX: 'hidden'
+    });
+    uiPanel.appendChild(receivedMessageP);
 
-    topicInput = createInput(defaultTopicName); // Create an input field initialized with the current topic name
-    topicInput.parent(topicContainer);
-    topicInput.style('flex', '1'); // Allows the input to expand and fill the space
-    topicInput.style('padding', '2px 3px');
-    topicInput.style('font-size', '12px');
-	
-	    // Listen for committed changes (blur/enter) to avoid rapid resubscribe while typing
-    topicInput.changed(updateTopicSubscription);
+    // Topic row
+    const topicContainer = document.createElement('div');
+    Object.assign(topicContainer.style, {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '10px'
+    });
+    uiPanel.appendChild(topicContainer);
 
-    // Broker configuration controls
-    let brokerContainer = createDiv('');
-    brokerContainer.parent(uiPanel);
-    brokerContainer.style('display', 'flex');
-    brokerContainer.style('justify-content', 'space-between');
-    brokerContainer.style('align-items', 'center');
-    brokerContainer.style('gap', '6px');
-    brokerContainer.style('margin-bottom', '10px');
+    const topicLabel = document.createElement('p');
+    topicLabel.textContent = 'Topic:';
+    Object.assign(topicLabel.style, {
+        fontFamily: 'Arial, sans-serif',
+        color: '#333',
+        fontSize: '12px',
+        margin: '0 5px 0 0'
+    });
+    topicContainer.appendChild(topicLabel);
 
-    let brokerLabel = createP('Host:');
-    brokerLabel.parent(brokerContainer);
-    brokerLabel.style('font-family', 'Arial, sans-serif');
-    brokerLabel.style('color', '#333');
-    brokerLabel.style('font-size', '12px');
-    brokerLabel.style('margin', '0 5px 0 0');
+    topicInput = document.createElement('input');
+    topicInput.type = 'text';
+    topicInput.value = defaultTopicName;
+    Object.assign(topicInput.style, {
+        flex: '1',
+        padding: '2px 3px',
+        fontSize: '12px'
+    });
+    // Listen for committed changes (blur/enter) to avoid rapid resubscribe while typing
+    topicInput.addEventListener('change', updateTopicSubscription);
+    topicContainer.appendChild(topicInput);
 
-    brokerPresetSelect = createSelect();
-    brokerPresetSelect.parent(brokerContainer);
-    brokerPresetSelect.option('wss://mqtt.aroughidea.com:9001', 'workshop');
-    brokerPresetSelect.option('ws://mqtt.aroughidea.com:9001', 'workshop_ws');
-    brokerPresetSelect.option('wss://test.mosquitto.org:8081', 'mosquitto');
-    brokerPresetSelect.option('ws://localhost:9001', 'local');
-    brokerPresetSelect.option('wss://localhost:9001', 'local_wss');
-    brokerPresetSelect.style('font-size', '12px');
-    brokerPresetSelect.style('flex', '1');
-        brokerPresetSelect.selected(selectedBrokerKey);
-    brokerPresetSelect.changed(onBrokerPresetChanged);
+    // Broker row
+    const brokerContainer = document.createElement('div');
+    Object.assign(brokerContainer.style, {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '6px',
+        marginBottom: '10px'
+    });
+    uiPanel.appendChild(brokerContainer);
 
-    // Connection status display to inform the user of the MQTT client's status.
-    connectionStatusP = createP('Connected: No');
-    connectionStatusP.parent(uiPanel);
-    connectionStatusP.style('font-family', 'Arial, sans-serif');
-    connectionStatusP.style('font-size', '12px');
-    connectionStatusP.style('margin', '5px 0');
+    const brokerLabel = document.createElement('p');
+    brokerLabel.textContent = 'Host:';
+    Object.assign(brokerLabel.style, {
+        fontFamily: 'Arial, sans-serif',
+        color: '#333',
+        fontSize: '12px',
+        margin: '0 5px 0 0'
+    });
+    brokerContainer.appendChild(brokerLabel);
+
+    brokerPresetSelect = document.createElement('select');
+    [
+        ['wss://mqtt.aroughidea.com:9001', 'workshop'],
+        ['ws://mqtt.aroughidea.com:9001',  'workshop_ws'],
+        ['wss://test.mosquitto.org:8081',  'mosquitto'],
+        ['ws://localhost:9001',            'local'],
+        ['wss://localhost:9001',           'local_wss']
+    ].forEach(function ([label, value]) {
+        const opt = document.createElement('option');
+        opt.textContent = label;
+        opt.value = value;
+        brokerPresetSelect.appendChild(opt);
+    });
+    brokerPresetSelect.value = selectedBrokerKey;
+    Object.assign(brokerPresetSelect.style, {
+        fontSize: '12px',
+        flex: '1'
+    });
+    brokerPresetSelect.addEventListener('change', onBrokerPresetChanged);
+    brokerContainer.appendChild(brokerPresetSelect);
+
+    // Connection status display
+    connectionStatusP = document.createElement('p');
+    connectionStatusP.textContent = 'Connected: No';
+    Object.assign(connectionStatusP.style, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '12px',
+        margin: '5px 0'
+    });
+    uiPanel.appendChild(connectionStatusP);
     updateConnectionStatusDisplay();
 
-    // Connection message display with timestamp on a separate line.
-    let statusContainer = createDiv('');
-    statusContainer.parent(uiPanel);
-    statusContainer.style('height', '80px');
-    statusContainer.style('max-height', '80px');
-    statusContainer.style('overflow', 'hidden');
-    statusContainer.style('text-align', 'center');
+    // Status log area (timestamp + message)
+    const statusContainer = document.createElement('div');
+    Object.assign(statusContainer.style, {
+        height: '80px',
+        maxHeight: '80px',
+        overflow: 'hidden',
+        textAlign: 'center'
+    });
+    uiPanel.appendChild(statusContainer);
 
-    displayTimestampP = createP('');
-    displayTimestampP.parent(statusContainer);
-    displayTimestampP.style('color', '#D11A2A');
-    displayTimestampP.style('font-family', 'Arial, sans-serif');
-    displayTimestampP.style('font-size', '10px');
-    displayTimestampP.style('line-height', '16px');
-    displayTimestampP.style('height', '16px');
-    displayTimestampP.style('margin', '0 0 2px 0');
-    displayTimestampP.style('white-space', 'nowrap');
-    displayTimestampP.style('overflow', 'hidden');
-    displayTimestampP.style('text-overflow', 'ellipsis');
-    displayTimestampP.style('transition', 'color 4s ease');
+    displayTimestampP = document.createElement('p');
+    Object.assign(displayTimestampP.style, {
+        color: '#D11A2A',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '10px',
+        lineHeight: '16px',
+        height: '16px',
+        margin: '0 0 2px 0',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        transition: 'color 4s ease'
+    });
+    statusContainer.appendChild(displayTimestampP);
 
-    displayMessageP = createP('Ready'); // Placeholder text to reserve vertical space
-    displayMessageP.parent(statusContainer);
-    displayMessageP.style('color', '#D11A2A');
-    displayMessageP.style('font-family', 'Arial, sans-serif');
-    displayMessageP.style('font-size', '10px');
-    displayMessageP.style('line-height', '16px');
-    displayMessageP.style('height', '64px');
-    displayMessageP.style('margin', '0');
-    displayMessageP.style('overflow', 'hidden');
-    displayMessageP.style('text-overflow', 'ellipsis');
-    displayMessageP.style('display', '-webkit-box');
-    displayMessageP.style('-webkit-line-clamp', '4');
-    displayMessageP.style('-webkit-box-orient', 'vertical');
-    displayMessageP.style('word-break', 'break-word');
-    displayMessageP.style('transition', 'color 4s ease');
+    displayMessageP = document.createElement('p');
+    displayMessageP.textContent = 'Ready';
+    Object.assign(displayMessageP.style, {
+        color: '#D11A2A',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '10px',
+        lineHeight: '16px',
+        height: '64px',
+        margin: '0',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        wordBreak: 'break-word',
+        transition: 'color 4s ease'
+    });
+    displayMessageP.style.display = '-webkit-box';
+    displayMessageP.style['-webkit-line-clamp'] = '4';
+    displayMessageP.style['-webkit-box-orient'] = 'vertical';
+    statusContainer.appendChild(displayMessageP);
 
     createTsCodeModal();
 }
@@ -680,148 +735,172 @@ function createTsCodeModal() {
         return;
     }
 
-    tsModalOverlay = createDiv('');
-    tsModalOverlay.style('position', 'fixed');
-    tsModalOverlay.style('top', '0');
-    tsModalOverlay.style('left', '0');
-    tsModalOverlay.style('width', '100vw');
-    tsModalOverlay.style('height', '100vh');
-    tsModalOverlay.style('background-color', 'rgba(0,0,0,0.45)');
-    tsModalOverlay.style('display', 'none');
-    tsModalOverlay.style('align-items', 'center');
-    tsModalOverlay.style('justify-content', 'center');
-    tsModalOverlay.style('z-index', '9999');
-
-    const modalCard = createDiv('');
-    modalCard.parent(tsModalOverlay);
-    modalCard.style('width', 'min(760px, 92vw)');
-    modalCard.style('max-height', '80vh');
-    modalCard.style('background-color', '#ffffff');
-    modalCard.style('border-radius', '10px');
-    modalCard.style('padding', '12px');
-    modalCard.style('box-sizing', 'border-box');
-    modalCard.style('display', 'flex');
-    modalCard.style('flex-direction', 'column');
-    modalCard.style('gap', '8px');
-
-    const modalHeader = createDiv('');
-    modalHeader.parent(modalCard);
-    modalHeader.style('display', 'flex');
-    modalHeader.style('justify-content', 'space-between');
-    modalHeader.style('align-items', 'center');
-
-    const modalTitle = createElement('h4', 'About This MQTT Demo + TypeScript Starter');
-    modalTitle.parent(modalHeader);
-    modalTitle.style('margin', '0');
-
-    const closeButton = createButton('Close');
-    closeButton.parent(modalHeader);
-    closeButton.mousePressed(closeTsCodeModal);
-
-    const modalIntro = createP('What is this? A lightweight MQTT demo client running in your browser over WebSockets. It lets you connect, subscribe, and publish without installing a full desktop MQTT tool.');
-    modalIntro.parent(modalCard);
-    modalIntro.style('margin', '0');
-    modalIntro.style('font-size', '12px');
-    modalIntro.style('line-height', '1.45');
-
-    const modalUseCases = createElement('ul', '');
-    modalUseCases.parent(modalCard);
-    modalUseCases.style('margin', '0 0 0 18px');
-    modalUseCases.style('padding', '0');
-    modalUseCases.style('font-size', '12px');
-    modalUseCases.style('line-height', '1.45');
-
-    createElement('li', 'Why use it: validate topic structure and payload flow quickly, with immediate feedback.').parent(modalUseCases);
-    createElement('li', 'Where used: IoT prototypes, workshop labs, telemetry demos, browser dashboards, and QA smoke tests.').parent(modalUseCases);
-    createElement('li', 'Who uses it: developers, integrators, students, trainers, and support/operations engineers.').parent(modalUseCases);
-
-    const modalSecurity = createP('Security note: any username/password placed in browser JavaScript is visible to end users and is not a secret. Use this only for demos/public test access. For production, keep credentials server-side and issue short-lived tokens to clients.');
-    modalSecurity.parent(modalCard);
-    modalSecurity.style('margin', '0');
-    modalSecurity.style('font-size', '12px');
-    modalSecurity.style('line-height', '1.45');
-    modalSecurity.style('color', '#A6131F');
-
-    const modalCodeLabel = createP('TypeScript starter example (includes placeholder auth fields for private brokers):');
-    modalCodeLabel.parent(modalCard);
-    modalCodeLabel.style('margin', '0');
-    modalCodeLabel.style('font-size', '12px');
-
-    const codePre = createElement('pre', '');
-    codePre.parent(modalCard);
-    codePre.style('margin', '0');
-    codePre.style('padding', '10px');
-    codePre.style('background-color', '#f5f5f5');
-    codePre.style('border', '1px solid #ddd');
-    codePre.style('border-radius', '8px');
-    codePre.style('overflow', 'auto');
-    codePre.style('font-size', '12px');
-    codePre.style('line-height', '1.4');
-    codePre.style('max-height', '60vh');
-    codePre.html(escapeHtml(tsClientCodeExample));
-
-    tsModalOverlay.mousePressed(function() {
-        closeTsCodeModal();
+    tsModalOverlay = document.createElement('div');
+    Object.assign(tsModalOverlay.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        display: 'none',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: '9999'
     });
 
-    modalCard.mousePressed(function(event) {
+    const modalCard = document.createElement('div');
+    Object.assign(modalCard.style, {
+        width: 'min(760px, 92vw)',
+        maxHeight: '80vh',
+        backgroundColor: '#ffffff',
+        borderRadius: '10px',
+        padding: '12px',
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px'
+    });
+    tsModalOverlay.appendChild(modalCard);
+
+    const modalHeader = document.createElement('div');
+    Object.assign(modalHeader.style, {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    });
+    modalCard.appendChild(modalHeader);
+
+    const modalTitle = document.createElement('h4');
+    modalTitle.textContent = 'About This MQTT Demo + TypeScript Starter';
+    modalTitle.style.margin = '0';
+    modalHeader.appendChild(modalTitle);
+
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Close';
+    closeButton.addEventListener('click', closeTsCodeModal);
+    modalHeader.appendChild(closeButton);
+
+    const modalIntro = document.createElement('p');
+    modalIntro.textContent = 'What is this? A lightweight MQTT demo client running in your browser over WebSockets. It lets you connect, subscribe, and publish without installing a full desktop MQTT tool.';
+    Object.assign(modalIntro.style, {
+        margin: '0',
+        fontSize: '12px',
+        lineHeight: '1.45'
+    });
+    modalCard.appendChild(modalIntro);
+
+    const modalUseCases = document.createElement('ul');
+    Object.assign(modalUseCases.style, {
+        margin: '0 0 0 18px',
+        padding: '0',
+        fontSize: '12px',
+        lineHeight: '1.45'
+    });
+    [
+        'Why use it: validate topic structure and payload flow quickly, with immediate feedback.',
+        'Where used: IoT prototypes, workshop labs, telemetry demos, browser dashboards, and QA smoke tests.',
+        'Who uses it: developers, integrators, students, trainers, and support/operations engineers.'
+    ].forEach(function (text) {
+        const li = document.createElement('li');
+        li.textContent = text;
+        modalUseCases.appendChild(li);
+    });
+    modalCard.appendChild(modalUseCases);
+
+    const modalSecurity = document.createElement('p');
+    modalSecurity.textContent = 'Security note: any username/password placed in browser JavaScript is visible to end users and is not a secret. Use this only for demos/public test access. For production, keep credentials server-side and issue short-lived tokens to clients.';
+    Object.assign(modalSecurity.style, {
+        margin: '0',
+        fontSize: '12px',
+        lineHeight: '1.45',
+        color: '#A6131F'
+    });
+    modalCard.appendChild(modalSecurity);
+
+    const modalCodeLabel = document.createElement('p');
+    modalCodeLabel.textContent = 'TypeScript starter example (includes placeholder auth fields for private brokers):';
+    Object.assign(modalCodeLabel.style, {
+        margin: '0',
+        fontSize: '12px'
+    });
+    modalCard.appendChild(modalCodeLabel);
+
+    const codePre = document.createElement('pre');
+    Object.assign(codePre.style, {
+        margin: '0',
+        padding: '10px',
+        backgroundColor: '#f5f5f5',
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+        overflow: 'auto',
+        fontSize: '12px',
+        lineHeight: '1.4',
+        maxHeight: '60vh'
+    });
+    codePre.innerHTML = escapeHtml(tsClientCodeExample);
+    modalCard.appendChild(codePre);
+
+    tsModalOverlay.addEventListener('click', closeTsCodeModal);
+    modalCard.addEventListener('click', function (event) {
         event.stopPropagation();
     });
-
-    window.addEventListener('keydown', function(event) {
+    window.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
             closeTsCodeModal();
         }
     });
+
+    document.body.appendChild(tsModalOverlay);
 }
 
 function openTsCodeModal() {
     if (!tsModalOverlay) {
         return;
     }
-    tsModalOverlay.style('display', 'flex');
+    tsModalOverlay.style.display = 'flex';
 }
 
 function closeTsCodeModal() {
     if (!tsModalOverlay) {
         return;
     }
-    tsModalOverlay.style('display', 'none');
+    tsModalOverlay.style.display = 'none';
 }
+
 
 // Function to display and manage error messages in the UI.
 function displayMessage(message, details) {
-	
-		// get the current time
+    // get the current time
     const timestamp = getTimestamp();
 
     const detailsText = formatDetailsText(details);
-	const baseText = `${message}`;
-	const messageText = detailsText ? `${baseText} ${detailsText}` : `${baseText}`;
+    const baseText = String(message);
+    const messageText = detailsText ? `${baseText} ${detailsText}` : baseText;
     const isErrorMessage = baseText.toLowerCase().includes('error');
 
     console.log(`displayMessage: [${timestamp}] ${messageText}`);
-    displayTimestampP.html(`[${timestamp}]`);
+    displayTimestampP.textContent = `[${timestamp}]`;
     if (detailsText && isErrorMessage) {
-        displayMessageP.html(`${escapeHtml(baseText)} <span style="color:#1E5AE8;">${escapeHtml(detailsText)}</span>`);
+        displayMessageP.innerHTML = `${escapeHtml(baseText)} <span style="color:#1E5AE8;">${escapeHtml(detailsText)}</span>`;
     } else {
-        displayMessageP.html(escapeHtml(messageText));
+        displayMessageP.innerHTML = escapeHtml(messageText);
     }
 
     if (messageFadeTimer) {
         clearTimeout(messageFadeTimer);
     }
 
-    displayTimestampP.style('transition', 'none');
-    displayTimestampP.style('color', '#D11A2A');
-    displayMessageP.style('transition', 'none');
-    displayMessageP.style('color', '#D11A2A');
-    void displayMessageP.elt.offsetWidth;
-    displayTimestampP.style('transition', 'color 4s ease');
-    displayMessageP.style('transition', 'color 4s ease');
+    displayTimestampP.style.transition = 'none';
+    displayTimestampP.style.color = '#D11A2A';
+    displayMessageP.style.transition = 'none';
+    displayMessageP.style.color = '#D11A2A';
+    void displayMessageP.offsetWidth;
+    displayTimestampP.style.transition = 'color 4s ease';
+    displayMessageP.style.transition = 'color 4s ease';
     messageFadeTimer = setTimeout(() => {
-        displayTimestampP.style('color', '#666666');
-        displayMessageP.style('color', '#4A4A4A');
+        displayTimestampP.style.color = '#666666';
+        displayMessageP.style.color = '#4A4A4A';
     }, 1000);
 }
 
@@ -855,8 +934,8 @@ function escapeHtml(value) {
 }
 
 function getTimestamp() {
-    // Get the current date and timeS
-		const now = new Date(); 
+    // Get the current date and time
+    const now = new Date();
 
     // Concatenate time components into a UTC timestamp string
     const timestamp = now.toISOString();

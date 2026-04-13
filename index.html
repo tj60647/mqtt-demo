@@ -3,26 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--
+        Content Security Policy:
+          script-src   — allows only this origin's scripts plus the pinned mqtt.js CDN
+          connect-src  — allows ws:// and wss:// for MQTT broker WebSocket connections
+          img-src      — allows local images (MQTT icon, favicon)
+          style-src    — allows this origin's stylesheet
+          default-src  — blocks everything else
+    -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'none'; script-src 'self' https://unpkg.com; connect-src ws: wss:; img-src 'self'; style-src 'self'">
     <title>MQTT Demo</title>
     <link rel="icon" type="image/svg+xml" href="mqtt-icon.svg">
-    <!-- Load p5.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
-    <!-- Load MQTT.js -->
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #e0e0e0;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
+    <!--
+        Load MQTT.js from a pinned version.
+        SRI: before deploying to production, compute the sha384 integrity hash of this exact
+        file and add: integrity="sha384-<base64hash>" crossorigin="anonymous"
+        Command: curl -sL <url> | openssl dgst -sha384 -binary | base64
+    -->
+    <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
 </head>
 <body>
-    <!-- The p5.js sketch in script.js will automatically populate the body -->
     <script src="script.js"></script>
 </body>
 </html>
