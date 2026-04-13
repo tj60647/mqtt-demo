@@ -838,7 +838,7 @@ function createTsCodeModal() {
         lineHeight: '1.4',
         maxHeight: '60vh'
     });
-    codePre.innerHTML = escapeHtml(tsClientCodeExample);
+    codePre.textContent = tsClientCodeExample;
     modalCard.appendChild(codePre);
 
     tsModalOverlay.addEventListener('click', closeTsCodeModal);
@@ -882,9 +882,14 @@ function displayMessage(message, details) {
     console.log(`displayMessage: [${timestamp}] ${messageText}`);
     displayTimestampP.textContent = `[${timestamp}]`;
     if (detailsText && isErrorMessage) {
-        displayMessageP.innerHTML = `${escapeHtml(baseText)} <span style="color:#1E5AE8;">${escapeHtml(detailsText)}</span>`;
+        displayMessageP.textContent = '';
+        displayMessageP.appendChild(document.createTextNode(baseText + ' '));
+        const detailSpan = document.createElement('span');
+        detailSpan.style.color = '#1E5AE8';
+        detailSpan.textContent = detailsText;
+        displayMessageP.appendChild(detailSpan);
     } else {
-        displayMessageP.innerHTML = escapeHtml(messageText);
+        displayMessageP.textContent = messageText;
     }
 
     if (messageFadeTimer) {
