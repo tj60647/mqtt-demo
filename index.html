@@ -5,22 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!--
         Content Security Policy:
-          script-src   — allows only this origin's scripts plus the exact pinned mqtt.js
-                         (matched by its SHA-384 SRI hash; no other CDN scripts allowed)
+          script-src   — allows only scripts from this origin ('self'); mqtt.js is now
+                         vendored locally so no external CDN or hash allowance is needed
           connect-src  — allows ws:// and wss:// for MQTT broker WebSocket connections
           img-src      — allows local images (MQTT icon, favicon)
           style-src    — allows this origin's stylesheet
           default-src  — blocks everything else
     -->
     <meta http-equiv="Content-Security-Policy"
-          content="default-src 'none'; script-src 'self' 'sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb'; connect-src ws: wss:; img-src 'self'; style-src 'self'">
+          content="default-src 'none'; script-src 'self'; connect-src ws: wss:; img-src 'self'; style-src 'self'">
     <title>MQTT Demo</title>
     <link rel="icon" type="image/svg+xml" href="mqtt-icon.svg">
     <link rel="stylesheet" href="style.css">
-    <!-- mqtt.js pinned to 5.10.4; integrity verified via SHA-384 SRI -->
-    <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"
-            integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb"
-            crossorigin="anonymous"></script>
+    <!-- mqtt.js 5.10.4 vendored locally from npm; integrity verified via SHA-384 SRI -->
+    <script src="mqtt.min.js"
+            integrity="sha384-Bi12oAdYr14AFkifhhBlMiJVpDvueq9uEXPV1B+vtGzvngGIdSIi/k4kDG+YDnyY"></script>
 </head>
 <body>
     <script src="script.js"></script>
